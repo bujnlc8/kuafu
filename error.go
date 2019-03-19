@@ -8,8 +8,8 @@ type BaseError struct {
 }
 
 func (err *BaseError)Error() string {
-	return fmt.Sprintf("error code :%d, msg:%s", err.Code, err.Msg)
+	return fmt.Sprintf("%d:%s", err.Code, err.Msg)
 }
 
 
-var RouterNotFound = &BaseError{Code: 1404, Msg:"router not found"}
+var RouterNotFound = &BaseError{Code: 4041, Msg:"router not found"}

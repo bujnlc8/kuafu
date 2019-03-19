@@ -16,7 +16,7 @@ type Registry struct {
 }
 
 func (registry *Registry) GET(path string, handler HandlerFunc) {
-	router := &Router{Method: GET, Path: path, Handlers: handler}
+	router := &Router{Method: GET, Path: path, Handler: handler}
 	s := router.ToString()
 	if _, ok := registry.server.Routers[s]; ok {
 		panic(fmt.Sprintf("redeclare %s", s))
@@ -26,7 +26,7 @@ func (registry *Registry) GET(path string, handler HandlerFunc) {
 }
 
 func (registry *Registry) POST(path string, handler HandlerFunc) {
-	router := &Router{Method: POST, Path: path, Handlers: handler}
+	router := &Router{Method: POST, Path: path, Handler: handler}
 	s := router.ToString()
 	if _, ok := registry.server.Routers[s]; ok {
 		panic(fmt.Sprintf("redeclare %s", s))
@@ -36,7 +36,7 @@ func (registry *Registry) POST(path string, handler HandlerFunc) {
 }
 
 func (registry *Registry) DELETE(path string, handler HandlerFunc) {
-	router := &Router{Method: DELETE, Path: path, Handlers: handler}
+	router := &Router{Method: DELETE, Path: path, Handler: handler}
 	s := router.ToString()
 	if _, ok := registry.server.Routers[s]; ok {
 		panic(fmt.Sprintf("redeclare %s", s))
@@ -46,7 +46,7 @@ func (registry *Registry) DELETE(path string, handler HandlerFunc) {
 }
 
 func (registry *Registry) PUT(path string, handler HandlerFunc) {
-	router := &Router{Method: PUT, Path: path, Handlers: handler}
+	router := &Router{Method: PUT, Path: path, Handler: handler}
 	s := router.ToString()
 	if _, ok := registry.server.Routers[s]; ok {
 		panic(fmt.Sprintf("redeclare %s", s))
@@ -56,15 +56,11 @@ func (registry *Registry) PUT(path string, handler HandlerFunc) {
 }
 
 type Router struct {
-	Method   string
-	Path     string
-	Handlers HandlerFunc
+	Method  string
+	Path    string
+	Handler HandlerFunc
 }
 
 func (router *Router) ToString() string {
 	return fmt.Sprintf("%s_%s", router.Path, router.Method)
-}
-
-func (router *Router) Do(ctx *Context) {
-	router.Handlers(ctx)
 }
