@@ -3,11 +3,16 @@ package kuafu
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
+type RouterStorage struct {
+	routers map[string]*Router
+}
+
 type Server struct {
-	Routers     map[string]*Router
+	Routers     map[string]*RouterStorage
 	MiddleWares []HandlerFunc
 	Debug       bool
 }
@@ -18,7 +23,7 @@ func (server *Server) Use(m ...HandlerFunc) {
 
 func NewServer() *Server {
 	return &Server{
-		Routers:     make(map[string]*Router),
+		Routers:     make(map[string]*RouterStorage),
 		MiddleWares: []HandlerFunc{KuafuMark},
 		Debug:       false,
 	}
@@ -28,23 +33,57 @@ func (server *Server) NewRegistry() *Registry {
 	return &Registry{server: server}
 }
 
+func (server *Server) NewGroup(name string, prefix string) *Group {
+	return &Group{server: server, name: name, prefix: prefix}
+}
+
+var reg, _ = regexp.Compile("<:(.*?)>")
+
 func (server *Server) findRouter(ctx *Context) (error, *Router) {
-	router := &Router{Path: ctx.request.URL.Path, Method: ctx.request.Method}
-	if v, ok := server.Routers[router.ToString()]; ok {
+	method := ctx.Request.Method
+	path := ctx.Request.URL.Path
+	router := &Router{path: path, method: method}
+	if v, ok := server.Routers[method].routers[router.String()]; ok {
 		return nil, v
 	} else {
-		return RouterNotFound, nil
+		routerStorage := server.Routers[method]
+		if routerStorage != nil {
+			for _, r := range routerStorage.routers {
+				if ok, _ := regexp.MatchString(reg.String(), r.path); !ok {
+					continue
+				}
+				params := reg.FindAllStringSubmatch(r.path, -1)
+				var paramName []string
+				for _, v := range params {
+					paramName = append(paramName, v[1])
+				}
+				regAnother, _ := regexp.Compile("^" + reg.ReplaceAllString(r.path, "(.*?)") + "$")
+				pathValue := regAnother.FindStringSubmatch(path)
+				if len(pathValue)-1 == len(paramName) {
+					for k, v := range paramName {
+						ctx.Params[v] = pathValue[k+1]
+					}
+					return nil, r
+				}
+			}
+		}
 	}
+	return RouterNotFound, nil
 }
 
 func (server *Server) NewContext(request *http.Request, response http.ResponseWriter) *Context {
 	ctx := Context{
-		server:       server,
-		request:      request,
-		response:     response,
-		session:      make(map[string]string),
-		handlerChain: nil,
+		Server:       server,
+		Request:      request,
+		Response:     response,
+		Session:      make(map[string]string),
+		HandlerChain: nil,
 		index:        0,
+		Params:       make(map[string]string),
+	}
+	//put param in ctx.params
+	for k, v := range request.URL.Query() {
+		ctx.Params[k] = v[0]
 	}
 	return &ctx
 }
@@ -52,24 +91,26 @@ func (server *Server) NewContext(request *http.Request, response http.ResponseWr
 func (server *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	ctx := server.NewContext(req, resp)
 	for _, v := range server.MiddleWares {
-		ctx.handlerChain = append(ctx.handlerChain, v)
+		ctx.HandlerChain = append(ctx.HandlerChain, v)
 	}
 	if err, router := server.findRouter(ctx); err != nil {
 		if server.Debug {
 			fmt.Println(req.URL.Path, err)
 		}
-		ctx.httpCode = 404
+		ctx.HttpCode = 404
 	} else {
 		// merge router handle and middleware
-		ctx.handlerChain = append(ctx.handlerChain, router.Handler)
+		ctx.HandlerChain = append(ctx.HandlerChain, router.handler)
 	}
 	ctx.Next()
 }
 
 func (server *Server) routers() []string {
-	rst := []string{}
-	for _, v := range server.Routers {
-		rst = append(rst, v.ToString())
+	var rst []string
+	for _, routerStorage := range server.Routers {
+		for _, router := range routerStorage.routers {
+			rst = append(rst, router.String())
+		}
 	}
 	return rst
 }

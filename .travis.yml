@@ -1,0 +1,7 @@
+language: go
+go:
+  - "1.11.1"
+
+script:
+  - go vet .
+  - go test -count=1 -v test/kuafu_test.go
