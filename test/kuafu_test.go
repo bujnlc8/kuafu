@@ -68,4 +68,7 @@ func TestKuafu(t *testing.T) {
 	json.Unmarshal(body, &h)
 	assert.Equal(t, h.Name, "")
 	assert.Equal(t, h.Age, 10)
+	req, _ = http.NewRequest("GET", kuafu.FormatString("%s/group/hello/world", ts.URL), nil)
+	resp, _ = ts.Client().Do(req)
+	assert.Equal(t, resp.StatusCode, 404)
 }
