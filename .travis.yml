@@ -4,5 +4,5 @@ go:
 
 script:
   - go vet .
-  - go test -count=1 -v .
-  - go test -bench=. -cpu=8 -count=1 logger/logger_test.go -v
+  - go test -count=1 -v server_test.go
+  - go test -bench=. -cpu=8 -count=8 -v logger/logger_test.go
