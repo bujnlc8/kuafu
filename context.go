@@ -2,6 +2,7 @@ package kuafu
 
 import (
 	"encoding/json"
+	"github.com/linghaihui/kuafu/util"
 	"net/http"
 )
 
@@ -27,7 +28,7 @@ func (ctx *Context) GetParam(name string, args ...interface{}) string {
 		return v
 	}
 	if len(args) > 0 {
-		return FormatString("%v", args[0])
+		return util.FormatString("%v", args[0])
 	}
 	return ""
 }

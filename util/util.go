@@ -1,7 +1,6 @@
-package kuafu
+package util
 
 import "fmt"
-
 
 // format string
 func FormatString(s string, args ...interface{}) string {

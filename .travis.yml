@@ -4,4 +4,5 @@ go:
 
 script:
   - go vet .
-  - go test -count=1 -v test/kuafu_test.go
+  - go test -count=1 -v .
+  - go test -bench=. -cpu=8 -count=1 logger/logger_test.go -v

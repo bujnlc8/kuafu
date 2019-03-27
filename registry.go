@@ -1,5 +1,7 @@
 package kuafu
 
+import "github.com/linghaihui/kuafu/util"
+
 const (
 	GET    = "GET"
 	POST   = "POST"
@@ -27,7 +29,7 @@ func (registry *Registry) doCommon(method string, path string, handler HandlerFu
 		registry.server.Routers[method] = routerStorage
 	} else {
 		if _, ok := registry.server.Routers[method].routers[s]; ok {
-			panic(FormatString("redeclare %s", s))
+			panic(util.FormatString("redeclare %s", s))
 		}
 	}
 	routerStorage.routers[s] = router
@@ -77,7 +79,7 @@ func (group *Group) doCommon(method string, path string, handler HandlerFunc) {
 		group.server.Routers[method] = routerStorage
 	} else {
 		if _, ok := group.server.Routers[method].routers[s]; ok {
-			panic(FormatString("redeclare router %s", s))
+			panic(util.FormatString("redeclare router %s", s))
 		}
 	}
 	routerStorage.routers[s] = router
@@ -100,5 +102,5 @@ func (group *Group) PUT(path string, handler HandlerFunc) {
 }
 
 func (router *Router) String() string {
-	return FormatString("%s||%s", router.method, router.path)
+	return util.FormatString("%s||%s", router.method, router.path)
 }

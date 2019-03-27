@@ -1,6 +1,7 @@
 package kuafu
 
 import (
+	"github.com/linghaihui/kuafu/util"
 	"log"
 )
 
@@ -24,6 +25,6 @@ func Handler404(ctx *Context) {
 
 // add kuafu mark in http header
 func KuafuMark(ctx *Context) {
-	ctx.Response.Header().Add("X-Server-Framework", FormatString("Kuafu/%s", Version))
+	ctx.Response.Header().Add("X-Server-Framework", util.FormatString("Kuafu/%s", Version))
 	ctx.Next()
 }
