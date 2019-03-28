@@ -17,47 +17,120 @@ const (
 )
 
 const (
-	LevelDebug = int8(1)
-	LevelWarn  = int8(2)
-	LevelErr   = int8(3)
-	LevelFatal = int8(4)
+	EveryHour  = 1
+	HalfDay    = 2
+	EveryDay   = 3
+	EveryWeek  = 4
+	EveryMonth = 5
+)
+
+const (
+	LevelDebug = 1
+	LevelWarn  = 2
+	LevelErr   = 3
+	LevelFatal = 4
 )
 
 type LoggerFile struct {
 	LoggerAbstract
-	lock        *sync.RWMutex
-	path        string
-	maxSize     int64
-	file        *os.File
-	splitByDate bool
-	splitBySize bool
-	minLevel    int8
+	lock          *sync.RWMutex
+	path          string
+	maxSize       int64
+	file          *os.File
+	splitBy       int
+	minLevel      int8
+	splitTimeMode int
+	nextTime      time.Time
 }
 
-func NewLogger(path string, maxSize int64, splitByWhat int, minLevel int8) *LoggerFile {
+// new split by size logger
+func NewSizeLogger(path string, maxSize int64, minLevel int8) *LoggerFile {
 	if fd, err := os.Create(path); err != nil {
 		panic(util.FormatString("open path %s error happens", path))
 	} else {
-		var splitByDate, splitBySize bool
-		if splitByWhat == SplitBySize {
-			splitBySize = true
-		} else if splitByWhat == SplitByDate {
-			splitByDate = true
-		}
 		if maxSize == 0 {
 			maxSize = 1024 * 1024 * 2 //default is 2MB
 		}
 		if minLevel == 0 {
-			minLevel = LevelWarn
+			minLevel = LevelWarn // default log level is warn
 		}
 		return &LoggerFile{
-			lock:        new(sync.RWMutex),
-			path:        path,
-			maxSize:     maxSize,
-			file:        fd,
-			splitByDate: splitByDate,
-			splitBySize: splitBySize,
-			minLevel:    minLevel,
+			lock:     new(sync.RWMutex),
+			path:     path,
+			maxSize:  maxSize,
+			file:     fd,
+			splitBy:  SplitBySize,
+			minLevel: minLevel,
+		}
+	}
+	return nil
+}
+
+// gen the next time of specific splitTime mode
+func genNextTime(splitTimeMode int) time.Time {
+	switch splitTimeMode {
+	case EveryHour:
+		nowStr := time.Now().Format("2006-01-02 15:00:00")
+		now, _ := time.Parse("2006-01-02 15:00:00", nowStr)
+		now = now.Add(time.Duration(time.Hour))
+		return now
+	case HalfDay:
+		now := time.Now()
+		if now.Hour() >= 12 {
+			nowStr := time.Now().Format("2006-01-02 00:00:00")
+			now, _ = time.Parse("2006-01-02 00:00:00", nowStr)
+			now = now.Add(time.Duration(24 * time.Hour))
+		} else {
+			nowStr := time.Now().Format("2006-01-02 00:00:00")
+			now, _ = time.Parse("2006-01-02 00:00:00", nowStr)
+			now = now.Add(time.Duration(12 * time.Hour))
+		}
+		return now
+	case EveryDay:
+		nowStr := time.Now().Format("2006-01-02 00:00:00")
+		now, _ := time.Parse("2006-01-02 00:00:00", nowStr)
+		now = now.Add(time.Duration(24 * time.Hour))
+		return now
+	case EveryWeek:
+		nowStr := time.Now().Format("2006-01-02 00:00:00")
+		now, _ := time.Parse("2006-01-02 00:00:00", nowStr)
+		noWeekDay := now.Weekday()
+		if noWeekDay == time.Sunday {
+			now = now.Add(time.Duration(24 * time.Hour))
+		} else {
+			now = now.Add(time.Duration(24*(8-int(noWeekDay))) * time.Hour)
+		}
+		return now
+	case EveryMonth:
+		nowStr := time.Now().Format("2006-01-02 00:00:00")
+		now, _ := time.Parse("2006-01-02 00:00:00", nowStr)
+		now = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, 1, 0)
+		return now
+	default:
+		panic("do not support split time mode")
+	}
+	return time.Time{}
+}
+
+// new split by time logger
+func NewTimeLogger(path string, splitTimeMode int, minLevel int8) *LoggerFile {
+	if fd, err := os.Create(path); err != nil {
+		panic(util.FormatString("open path %s error happens", path))
+	} else {
+		if splitTimeMode == 0 {
+			splitTimeMode = EveryDay //default is every day
+		}
+		if minLevel == 0 {
+			minLevel = LevelWarn // default log level is warn
+		}
+		return &LoggerFile{
+			lock:          new(sync.RWMutex),
+			path:          path,
+			file:          fd,
+			splitBy:       SplitByDate,
+			minLevel:      minLevel,
+			splitTimeMode: splitTimeMode,
+			nextTime:      genNextTime(splitTimeMode),
 		}
 	}
 	return nil
@@ -116,12 +189,14 @@ func (logger *LoggerFile) write(args ...interface{}) {
 	logger.lock.Lock()
 	defer logger.lock.Unlock()
 	str += "\n"
-	if logger.splitBySize {
+	switch logger.splitBy {
+	case SplitBySize:
 		if fileInfo, err := os.Stat(logger.path); err != nil {
 			panic(err)
 		} else {
 			if fileInfo.Size() > logger.maxSize {
-				if err := os.Rename(logger.path, logger.path+"."+strconv.Itoa(time.Now().Nanosecond())); err != nil {
+				if err := os.Rename(logger.path,
+					logger.path+"."+strconv.Itoa(time.Now().Nanosecond())); err != nil {
 					panic(err)
 				}
 				if newFile, err := os.Create(logger.path); err != nil {
@@ -131,6 +206,21 @@ func (logger *LoggerFile) write(args ...interface{}) {
 				}
 			}
 		}
+	case SplitByDate:
+		if time.Now().After(logger.nextTime) {
+			if err := os.Rename(logger.path,
+				logger.path+"."+strconv.Itoa(time.Now().Nanosecond())); err != nil {
+				panic(err)
+			}
+			if newFile, err := os.Create(logger.path); err != nil {
+				panic(err)
+			} else {
+				logger.file = newFile
+				logger.nextTime = genNextTime(logger.splitTimeMode)
+			}
+		}
+	default:
+		panic("do not support split type")
 	}
 	if _, err := logger.file.Write([]byte(str)); err != nil {
 		panic(err)
