@@ -2,6 +2,7 @@ package kuafu_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/linghaihui/kuafu"
 	"github.com/linghaihui/kuafu/util"
 	"github.com/magiconair/properties/assert"
@@ -22,12 +23,16 @@ type Hello struct {
 func SayHello(ctx *kuafu.Context) {
 	age := ctx.GetParam("age", "10")
 	ageInt, _ := strconv.Atoi(age)
-	ctx.Json(200, Hello{
+	ctx.JsonResponse(200, Hello{
 		Code: 0,
 		Msg:  util.FormatString("Hello %s", ctx.GetParam("name")),
 		Name: ctx.GetParam("name"),
 		Age:  ageInt,
 	})
+}
+
+func Redirect(ctx *kuafu.Context) {
+	ctx.RedirectResponse("https://www.baidu.com", 302)
 }
 
 func common() *kuafu.Server {
@@ -39,6 +44,7 @@ func common() *kuafu.Server {
 	registry.POST("/hello/<:name>/<:age>", SayHello)
 	group := server.NewGroup("group", "/group")
 	group.GET("/hello", SayHello)
+	registry.GET("/redirect", Redirect)
 	return server
 }
 
@@ -53,7 +59,9 @@ func TestServer(t *testing.T) {
 	assert.Equal(t, resp.Header["X-Server-Framework"][0], util.FormatString("Kuafu/%s", kuafu.Version))
 	body, _ := ioutil.ReadAll(resp.Body)
 	h := Hello{}
-	json.Unmarshal(body, &h)
+	if err := json.Unmarshal(body, &h); err != nil {
+		panic(err)
+	}
 	assert.Equal(t, h.Name, "haihui")
 	assert.Equal(t, h.Age, 25)
 	// test POST
@@ -62,7 +70,9 @@ func TestServer(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, resp.Header["X-Server-Framework"][0], util.FormatString("Kuafu/%s", kuafu.Version))
 	body, _ = ioutil.ReadAll(resp.Body)
-	json.Unmarshal(body, &h)
+	if err := json.Unmarshal(body, &h); err != nil {
+		panic(err)
+	}
 	assert.Equal(t, h.Name, "linghaihui")
 	assert.Equal(t, h.Age, 2)
 	// test group
@@ -71,12 +81,19 @@ func TestServer(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, 200)
 	assert.Equal(t, resp.Header["X-Server-Framework"][0], util.FormatString("Kuafu/%s", kuafu.Version))
 	body, _ = ioutil.ReadAll(resp.Body)
-	json.Unmarshal(body, &h)
+	if err := json.Unmarshal(body, &h); err != nil {
+		panic(err)
+	}
 	assert.Equal(t, h.Name, "")
 	assert.Equal(t, h.Age, 10)
 	req, _ = http.NewRequest("GET", util.FormatString("%s/group/hello/world", ts.URL), nil)
 	resp, _ = ts.Client().Do(req)
 	assert.Equal(t, resp.StatusCode, 404)
+	// test redirect
+	req, _ = http.NewRequest("GET", util.FormatString("%s/redirect", ts.URL), nil)
+	resp, _ = ts.Client().Do(req)
+	fmt.Println(resp.Body, resp.Header)
+	//assert.Equal(t, resp.StatusCode, 302)
 }
 
 func BenchmarkServer(b *testing.B) {

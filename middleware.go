@@ -9,7 +9,7 @@ import (
 func PrintRequest(ctx *Context) {
 	ctx.Next()
 	log.Println(ctx.Request.Method, ctx.Request.URL.Path, ctx.HttpCode)
-	if ctx.Server.Debug {
+	if ctx.Server.debug {
 		log.Println("response body:", string(ctx.responseBytes))
 	}
 }

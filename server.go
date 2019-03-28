@@ -14,7 +14,7 @@ type RouterStorage struct {
 type Server struct {
 	Routers     map[string]*RouterStorage
 	MiddleWares []HandlerFunc
-	Debug       bool
+	debug       bool
 }
 
 func (server *Server) Use(m ...HandlerFunc) {
@@ -24,8 +24,8 @@ func (server *Server) Use(m ...HandlerFunc) {
 func NewServer() *Server {
 	return &Server{
 		Routers:     make(map[string]*RouterStorage),
-		MiddleWares: []HandlerFunc{KuafuMark},
-		Debug:       false,
+		MiddleWares: []HandlerFunc{KuafuMark, PrintRequest, Handler404},
+		debug:       false,
 	}
 }
 
@@ -39,6 +39,7 @@ func (server *Server) NewGroup(name string, prefix string) *Group {
 
 var reg, _ = regexp.Compile("<:(.*?)>")
 
+// find the handle
 func (server *Server) findRouter(ctx *Context) (error, *Router) {
 	method := ctx.Request.Method
 	path := ctx.Request.URL.Path
@@ -61,7 +62,7 @@ func (server *Server) findRouter(ctx *Context) (error, *Router) {
 				pathValue := regAnother.FindStringSubmatch(path)
 				if len(pathValue)-1 == len(paramName) {
 					for k, v := range paramName {
-						ctx.Params[v] = pathValue[k+1]
+						ctx.params[v] = pathValue[k+1]
 					}
 					return nil, r
 				}
@@ -79,11 +80,11 @@ func (server *Server) NewContext(request *http.Request, response http.ResponseWr
 		Session:      make(map[string]string),
 		HandlerChain: nil,
 		index:        0,
-		Params:       make(map[string]string),
+		params:       make(map[string]string),
 	}
 	//put param in ctx.params
 	for k, v := range request.URL.Query() {
-		ctx.Params[k] = v[0]
+		ctx.params[k] = v[0]
 	}
 	return &ctx
 }
@@ -94,7 +95,7 @@ func (server *Server) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		ctx.HandlerChain = append(ctx.HandlerChain, v)
 	}
 	if err, router := server.findRouter(ctx); err != nil {
-		if server.Debug {
+		if server.debug {
 			fmt.Println(req.URL.Path, err)
 		}
 		ctx.HttpCode = 404
@@ -117,7 +118,7 @@ func (server *Server) routers() []string {
 
 // set debug mode so that you can see more log
 func (server *Server) SetDebugMode() {
-	server.Debug = true
+	server.debug = true
 }
 
 func (server *Server) Run(addr string) {

@@ -38,14 +38,14 @@ type LoggerFile struct {
 	maxSize       int64
 	file          *os.File
 	splitBy       int
-	minLevel      int8
+	minLevel      int
 	splitTimeMode int
 	nextTime      time.Time
 }
 
 // new split by size logger
-func NewSizeLogger(path string, maxSize int64, minLevel int8) *LoggerFile {
-	if fd, err := os.Create(path); err != nil {
+func NewSizeLogger(path string, maxSize int64, minLevel int) *LoggerFile {
+	if fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666); err != nil {
 		panic(util.FormatString("open path %s error happens", path))
 	} else {
 		if maxSize == 0 {
@@ -113,8 +113,8 @@ func genNextTime(splitTimeMode int) time.Time {
 }
 
 // new split by time logger
-func NewTimeLogger(path string, splitTimeMode int, minLevel int8) *LoggerFile {
-	if fd, err := os.Create(path); err != nil {
+func NewTimeLogger(path string, splitTimeMode int, minLevel int) *LoggerFile {
+	if fd, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666); err != nil {
 		panic(util.FormatString("open path %s error happens", path))
 	} else {
 		if splitTimeMode == 0 {
@@ -185,7 +185,7 @@ func (logger *LoggerFile) Fatal(args ...interface{}) {
 	os.Exit(1)
 }
 func (logger *LoggerFile) write(args ...interface{}) {
-	str := util.FormatString(strings.Repeat("%v  ", len(args)), args...)
+	str := util.FormatString(strings.Repeat("%v ", len(args)), args...)
 	logger.lock.Lock()
 	defer logger.lock.Unlock()
 	str += "\n"
